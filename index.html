@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot Widget - Local Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .status {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .instructions {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .instructions h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .instructions ol {
+            margin-left: 20px;
+            color: #555;
+            line-height: 1.6;
+        }
+        
+        .instructions li {
+            margin-bottom: 8px;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin-top: 20px;
+        }
+        
+        button:hover {
+            transform: scale(1.05);
+        }
+        
+        .test-input {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        input {
+            flex: 1;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 RAG Chatbot Widget - Test Page</h1>
+        
+        <div class="status" id="status">
+            <strong>Status:</strong> Checking API connection...
+        </div>
+        
+        <div class="instructions">
+            <h3>📋 Setup Instructions</h3>
+            <ol>
+                <li>Make sure your FastAPI server is running: <code>uvicorn app.main:app --reload</code></li>
+                <li>Verify your vector_db is populated: <code>python run_upload.py</code></li>
+                <li>Check the Status above - should show "Connected"</li>
+                <li>Test the chatbot using the input below</li>
+                <li>Once working, copy the code from <strong>wordpress-functions.php</strong> to your WordPress theme</li>
+            </ol>
+        </div>
+        
+        <div class="test-input">
+            <input type="text" id="test-input" placeholder="Test a question here...">
+            <button onclick="testQuestion()">Test</button>
+        </div>
+        
+        <div id="test-output" style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; display: none;">
+            <h4>Response:</h4>
+            <p id="output-text"></p>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'https://loudish-meredith-unpunctured.ngrok-free.dev/chat';
+        
+        // Check API connection on page load
+        async function checkConnection() {
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: 'test' })
+                });
+                
+                if (response.ok) {
+                    document.getElementById('status').innerHTML = 
+                        '<strong style="color: #155724;">✓ Connected to API</strong><br>' +
+                        '✓ CORS enabled<br>' +
+                        '✓ Ready for WordPress integration';
+                    document.getElementById('status').className = 'status connected';
+                } else {
+                    throw new Error('API returned status: ' + response.status);
+                }
+            } catch (error) {
+                document.getElementById('status').innerHTML = 
+                    '<strong style="color: #721c24;">✗ Cannot connect to API</strong><br>' +
+                    'Error: ' + error.message + '<br>' +
+                    'Make sure: 1) FastAPI is running, 2) Vector DB is initialized';
+                document.getElementById('status').className = 'status error';
+            }
+        }
+        
+        async function testQuestion() {
+            const input = document.getElementById('test-input');
+            const message = input.value.trim();
+            
+            if (!message) {
+                alert('Please enter a question');
+                return;
+            }
+            
+            try {
+                document.getElementById('test-output').style.display = 'block';
+                document.getElementById('output-text').innerHTML = 'Loading...';
+                
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: message })
+                });
+                
+                const data = await response.json();
+                
+                let output = data.answer;
+                if (data.contact_info) {
+                    output += '<br><br><strong>Contact Info:</strong><br>';
+                    output += 'Phones: ' + data.contact_info.phone_numbers.join(', ') + '<br>';
+                    output += 'WhatsApp: ' + data.contact_info.whatsapp;
+                }
+                
+                document.getElementById('output-text').innerHTML = output;
+                input.value = '';
+            } catch (error) {
+                document.getElementById('output-text').innerHTML = 
+                    '<strong style="color: #721c24;">Error:</strong> ' + error.message;
+            }
+        }
+        
+        // Allow Enter key to send
+        document.getElementById('test-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                testQuestion();
+            }
+        });
+        
+        // Check connection when page loads
+        window.addEventListener('load', checkConnection);
+    </script>
+</body>
+</html>
